@@ -9,12 +9,6 @@ from mutagen.id3 import ID3, APIC, error
 from yt_dlp.utils import sanitize_filename
 from PIL import Image
 
-def get_ext_from_url(url):
-    """Extract file extension from a URL (default to jpg)."""
-    path = urlparse(url).path
-    ext = os.path.splitext(path)[1].lstrip(".")
-    return ext if ext else "jpg"
-
 def download_youtube_audio(url, output_dir):
     ydl_opts = {
         "format": "bestaudio/best",
@@ -24,13 +18,12 @@ def download_youtube_audio(url, output_dir):
             {"key": "FFmpegMetadata"},
         ],
         "writethumbnail": True,
+        "quiet": True,
     }
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=True)
         title = sanitize_filename(info.get("title", "output"))
-
-        # Final mp3 path
         mp3_path = os.path.join(output_dir, f"{title}.mp3")
 
         # yt-dlp writes thumbnail alongside audio with video extension
@@ -44,8 +37,8 @@ def download_youtube_audio(url, output_dir):
                 thumb_file = candidate
                 break
 
+        # Convert webp → jpg if needed
         if thumb_file and thumb_file.endswith(".webp"):
-            # Convert webp to jpg for compatibility
             img = Image.open(thumb_file).convert("RGB")
             jpg_file = thumb_file.rsplit(".", 1)[0] + ".jpg"
             img.save(jpg_file, "JPEG")
@@ -55,17 +48,15 @@ def download_youtube_audio(url, output_dir):
 
 def embed_thumbnail(mp3_path, thumb_path):
     if not thumb_path or not os.path.exists(thumb_path):
-        print("⚠️ No thumbnail found, skipping embedding.")
+        print(f"⚠️ No thumbnail found for {mp3_path}, skipping embedding.")
         return
 
     audio = MP3(mp3_path, ID3=ID3)
-
     try:
         audio.add_tags()
     except error:
         pass
 
-    # Guess mime type
     mime = "image/jpeg"
     if thumb_path.lower().endswith("png"):
         mime = "image/png"
@@ -83,24 +74,45 @@ def embed_thumbnail(mp3_path, thumb_path):
     audio.save()
     print(f"✅ Embedded thumbnail into {mp3_path}")
 
+def process_url(url):
+    with tempfile.TemporaryDirectory() as tmpdir:
+        try:
+            mp3_path, thumb_path, title = download_youtube_audio(url, tmpdir)
+            final_mp3 = f"{title}.mp3"
+
+            if os.path.exists(final_mp3):
+                os.remove(final_mp3)
+
+            os.rename(mp3_path, final_mp3)
+            embed_thumbnail(final_mp3, thumb_path)
+            print(f"🎵 Done! Saved as {final_mp3}")
+        except Exception as e:
+            print(f"❌ Failed to process {url}: {e}")
+
 def main():
-    if len(sys.argv) < 2:
-        print("Usage: python yt2mp3.py <YouTube URL>")
+    if len(sys.argv) != 2:
+        print("Usage:")
+        print("  python yt2mp3.py <YouTube URL>")
+        print("  python yt2mp3.py list.csv")
         sys.exit(1)
 
-    url = sys.argv[1]
-    with tempfile.TemporaryDirectory() as tmpdir:
-        mp3_path, thumb_path, title = download_youtube_audio(url, tmpdir)
+    arg = sys.argv[1]
 
-        final_mp3 = f"{title}.mp3"
-        if os.path.exists(final_mp3):
-            os.remove(final_mp3)  # overwrite if exists
+    if arg.lower().endswith(".csv"):
+        if not os.path.exists(arg):
+            print(f"❌ File {arg} not found.")
+            sys.exit(1)
 
-        os.rename(mp3_path, final_mp3)
+        with open(arg, "r", encoding="utf-8") as f:
+            urls = [line.strip() for line in f if line.strip()]
 
-        embed_thumbnail(final_mp3, thumb_path)
-
-        print(f"🎵 Done! Saved as {final_mp3}")
+        print(f"📄 Found {len(urls)} URLs in {arg}")
+        for url in urls:
+            print(f"➡️ Processing {url}")
+            process_url(url)
+    else:
+        # Single URL mode
+        process_url(arg)
 
 if __name__ == "__main__":
     main()
