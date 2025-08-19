@@ -1,0 +1,15 @@
+# Prepare links in list.csv
+it should be formated as below:
+```
+https://www.youtube.com/watch?v=Xs0Lxif1u9E
+https://www.youtube.com/watch?v=PDSkFeMVNFs
+https://www.youtube.com/watch?v=nD6R0Oojdn8
+https://www.youtube.com/watch?v=yLIcKANHoRY
+https://www.youtube.com/watch?v=LdVac2GNVvM
+https://www.youtube.com/watch?v=5GUaMOpfmr8
+```
+
+# To run the script
+```
+python yt2mp3 list.csv
+```
