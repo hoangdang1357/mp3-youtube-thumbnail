@@ -12,6 +12,7 @@ from PIL import Image
 def download_youtube_audio(url, output_dir):
     ydl_opts = {
         "format": "bestaudio/best",
+        "cookiefile": "www.youtube.com_cookies.txt",
         "outtmpl": os.path.join(output_dir, "%(title)s.%(ext)s"),
         "postprocessors": [
             {"key": "FFmpegExtractAudio", "preferredcodec": "mp3", "preferredquality": "192"},
